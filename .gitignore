@@ -1,1 +1,3 @@
 corpus
+*.bak
+venv
