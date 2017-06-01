@@ -6,9 +6,9 @@ use strict;
 
 use File::Basename;
 
-our $root_dir = $ENV{REPO_DIR} || './';
+my $root_dir = $ENV{REPO_DIR} || './';
 
-our $reporters = initialize_reporters("$root_dir/reporters.txt");
+my $reporters = initialize_reporters("$root_dir/reporters.txt");
 
 # Perl code note:
 # Schwartzian Transform to sort the list of reporters by length,
@@ -20,23 +20,27 @@ our $reporters = initialize_reporters("$root_dir/reporters.txt");
 # Reasoning note:
 # Sorting by length here is important because some of the reporters
 # have substrings that are the same, and can cause an early match.
-our $reporters_re = join('|', map {"\Q$_->[0]\E"}
-                              sort {$b->[1] <=> $a->[1]}
-                              map {[$_, length($_)]}
-                              keys %$reporters);
+my $reporters_re = join('|', map {"\Q$_->[0]\E"}
+                             sort {$b->[1] <=> $a->[1]}
+                             map {[$_, length($_)]}
+                             keys %$reporters);
 
+my $id_re = qr{Id\., at \d+(?:-\d+)?};
 my $citation_re = qr{(                    # whole citation
                       (                   # short citation
                        \d+                # volume
                        \s
                        ($reporters_re))   # reporter
                        (?:
-                        ,? \s at \s \d+  # repeated citation
+                        ,? \s at \s \d+(?:-\d+)?  # repeated citation
                         |
-                        \s (\d+)          # page number, first citation
-                      )
+                        \s (\d+)           # page number, first citation
+                       )
+                       (?:, \s n\. \s \d+)?
                      )
                     }x;
+
+my $compound_citation_re = qr{Ibid\.|(?:$id_re|$citation_re)(?:\s*,\s*\d+)?(?:\s*,\s*$citation_re)+|(?:$id_re|$citation_re)(?:\s*,\s*$citation_re)*};
 
 # if there are command-line arguments, read filenames from the command line.
 # otherwise, get them from STDIN.
@@ -64,26 +68,44 @@ sub process_one_file {
     undef $/;
 
     my $file_content = <$fh>;
+    my $previous_short_citation;
+    my $previous_compound_citation;
 
     my %citations;
-    while($file_content =~ m{$citation_re}g) {
-        my($citation, $short_cite, $reporter, $first_cite) = ($1, $2, $3, $4);
+    while($file_content =~ m{($compound_citation_re)}g) {
+        my $compound_citation = $1;
 
-        if( $first_cite ) {
-            $citations{$short_cite} = {
-                count => 1,
-                full_citation => $citation,
-                reporter => $reporter,
-            }
+        if($compound_citation =~ m{^Ibid\.$}) {
+            $compound_citation = $previous_compound_citation;
         }
-        else {
-            unless( $citations{$short_cite} ) {
-                print STDERR 'WARNING: found a second citation format for ',
-                             "$citation in $filename without a first citation!",
-                             " Skipping...\n";
-                next;
+
+        $compound_citation =~ s{^Id\.}{$previous_short_citation};
+        $previous_compound_citation = $compound_citation;
+
+        my $citation_count = 0;
+        while($compound_citation =~ m{$citation_re}g) {
+            my($citation, $short_cite, $reporter, $page_number) = ($1, $2, $3, $4);
+
+            if( $citation_count++ == 0 ) {
+                $previous_short_citation = $short_cite;
             }
-            $citations{$short_cite}{count}++;
+
+            unless( defined $citations{$short_cite} ) {
+                $citations{$short_cite} = {
+                    count => 1,
+                    full_citation => $citation,
+                    reporter => $reporter,
+                }
+            }
+            else {
+                unless( $citations{$short_cite} ) {
+                    print STDERR 'WARNING: found a second citation format for ',
+                                 "$citation in $filename without a first citation!",
+                                 " Skipping...\n";
+                    next;
+                }
+                $citations{$short_cite}{count}++;
+            }
         }
     }
 
