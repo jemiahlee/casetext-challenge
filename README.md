@@ -1,6 +1,7 @@
-# Jeremiah Lee's Casetext Coding Challenge #
+# Jeremiah's Casetext Coding Challenge #
 
-Solution to the problem presented in [this doc](https://docs.google.com/document/d/1_weQjLMyPGgyc6prlCmxONLCDkr_bXusuhiLsmT96k4/edit?usp=sharing).
+This is a solution to the problem presented in
+[this doc](https://docs.google.com/document/d/15mAWJXfCs4i0e8qyusaXMElqMGrB3q_wOamH6Qi49qI/edit).
 
 ## Approach
 
@@ -107,3 +108,6 @@ hand curate those files that seem to be in error.
 The code as written would need some major modification to support complex *Id.*
 cases (and does not count any *Id.* citations now). For simpler cases, it would
 not need much modification at all.
+
+Update on this section: I have added *Id.* support to the solution as well, but
+it may be less well-tested than the rest.
